@@ -79,6 +79,21 @@ export function describeLimitError(error: unknown): string {
   return detail
 }
 
+/**
+ * Compare two location directories. RPC events are broadcast to every
+ * location on the server, so listeners must ignore events from elsewhere.
+ * Windows paths are case-insensitive and either separator is accepted.
+ */
+export function sameDirectory(a: unknown, b: unknown): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false
+  const normalize = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "")
+  const left = normalize(a)
+  const right = normalize(b)
+  if (!left || !right) return false
+  const windows = /^[a-zA-Z]:\//.test(left) || /^[a-zA-Z]:\//.test(right)
+  return windows ? left.toLowerCase() === right.toLowerCase() : left === right
+}
+
 /** Input tokens allowed for messages once output and the system prompt are paid for. */
 export function inputBudget(cap: number, output: number, systemTokens: number): number {
   return Math.max(MIN_INPUT, cap - output - systemTokens)

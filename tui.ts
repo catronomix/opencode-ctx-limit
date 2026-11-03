@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin/tui"
 
-import { describeError, describeLimitError } from "./logic.ts"
+import { describeError, describeLimitError, sameDirectory } from "./logic.ts"
 import { CtxLimit } from "./rpc.ts"
 
 const MIN_LIMIT = 4096
@@ -60,6 +60,10 @@ export default Plugin.define({
     void sync()
 
     const unsubscribe = rpc.events.on("changed", (event) => {
+      // Events are broadcast to every location on the server; applying
+      // another project's cap would show the wrong number here.
+      const from = (event as { location?: { directory?: string } } | undefined)?.location?.directory
+      if (from && !sameDirectory(from, location.directory)) return
       update((draft) => {
         draft.limit = Number(event?.data?.limit ?? 0) || 0
       })

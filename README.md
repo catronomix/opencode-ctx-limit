@@ -48,6 +48,10 @@ One entry loads every part. Both parts are required for the menu; enforcement wo
 own. If only the terminal part is running, changing the cap reports that the server part is
 not loaded instead of failing silently.
 
+The same layout works per project: clone into `<project>/.opencode/plugins/ctx-limit`. Each
+location stores its own cap, and a session only reacts to cap changes made at its own
+location (RPC events are broadcast server-wide).
+
 To update:
 
 ```sh
@@ -77,7 +81,7 @@ Token counts are a cheap provider-agnostic estimate (~4 characters per token), n
 tokenizer, so leave headroom for real tokenizers.
 
 Settings sync across windows through the plugin RPC channel (`rpc.ts`), so changing the cap
-in one window updates the others.
+in one window updates the others in the same location.
 
 ## Troubleshooting
 

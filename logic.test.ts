@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { describeError, describeLimitError, estimateTokens, inputBudget, outputBudget, trimMessages, type Message } from "./logic.ts"
+import { describeError, describeLimitError, estimateTokens, inputBudget, outputBudget, sameDirectory, trimMessages, type Message } from "./logic.ts"
 
 const text = (value: string): Message => ({ role: "user", content: [{ type: "text", text: value }] })
 
@@ -59,6 +59,16 @@ test("trimMessages handles a conversation without user turns", () => {
   const messages: Message[] = [{ role: "system", content: [{ type: "text", text: "x".repeat(4_000) }] }]
   const result = trimMessages(messages, 10)
   assert.equal(result.dropped, 0)
+})
+
+test("sameDirectory ignores events from other locations", () => {
+  assert.equal(sameDirectory("/var/lib/pterodactyl/volumes", "/var/lib/pterodactyl/volumes"), true)
+  assert.equal(sameDirectory("/var/lib/pterodactyl/volumes/", "/var/lib/pterodactyl/volumes"), true)
+  assert.equal(sameDirectory("/home/me/project", "/home/me/other"), false)
+  assert.equal(sameDirectory("C:\\GITHUB", "c:/github"), true)
+  assert.equal(sameDirectory("C:\\GITHUB\\", "C:/GITHUB"), true)
+  assert.equal(sameDirectory("C:/GITHUB", "D:/GITHUB"), false)
+  assert.equal(sameDirectory(undefined, "/home/me/project"), false)
 })
 
 test("describeError reads messages from RPC plain objects, not just Error", () => {
