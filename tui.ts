@@ -30,10 +30,17 @@ type Limit = { limit: number }
 export default Plugin.define({
   id: "ctx-limit.tui",
   async setup(context) {
+    // Every RPC call must name the location this plugin instance runs in.
+    // Without it the client falls back to the server's working directory,
+    // which is usually a different location than the one the TUI is in, so
+    // the server part looks unregistered (`rpc.unavailable`).
+    const location = context.location ?? context.data.location.default()
+    const options = { location }
+
     const rpc = context.client.rpc(CtxLimit) as unknown as {
-      get(): Promise<Limit>
-      set(input: { limit: number }): Promise<Limit>
-      clear(): Promise<Limit>
+      get(input: Record<string, never>, options?: { location: typeof location }): Promise<Limit>
+      set(input: { limit: number }, options?: { location: typeof location }): Promise<Limit>
+      clear(input: Record<string, never>, options?: { location: typeof location }): Promise<Limit>
       events: { on(name: "changed", listener: (event: { data: Limit }) => void): () => void }
     }
 
@@ -41,7 +48,7 @@ export default Plugin.define({
 
     const sync = async () => {
       try {
-        const result = await rpc.get()
+        const result = await rpc.get({}, options)
         update((draft) => {
           draft.limit = Number(result?.limit ?? 0) || 0
         })
@@ -60,7 +67,7 @@ export default Plugin.define({
 
     const setLimit = async (limit: number) => {
       try {
-        const result = limit > 0 ? await rpc.set({ limit }) : await rpc.clear()
+        const result = limit > 0 ? await rpc.set({ limit }, options) : await rpc.clear({}, options)
         const applied = Number(result?.limit ?? 0) || 0
         update((draft) => {
           draft.limit = applied

@@ -82,10 +82,11 @@ in one window updates the others.
 ## Troubleshooting
 
 `Global context limit — The ctx-limit server part is not running at this location` means the
-terminal part loaded but the server part did not, so there is no RPC to change the cap. Check
-`GET /api/plugin` (via `opencode api get /api/plugin`) for an active `ctx-limit` entry with
-`server`, `tui`, and `rpc` features, and read the server log at
-`~/.local/share/opencode/log/opencode.log`.
+terminal part loaded but there was no `ctx-limit` server part at the location the request was
+addressed to. The plugin always sends its own `location` with each RPC call, so this normally
+means the server part failed during setup. Check `GET /api/plugin` (via
+`opencode api get /api/plugin`) for an active `ctx-limit` entry with `server`, `tui`, and `rpc`
+features, and read the server log at `~/.local/share/opencode/log/opencode.log`.
 
 Any other message here is the real error text returned by the server, including its RPC error
 type.
