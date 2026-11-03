@@ -19,26 +19,40 @@ local models with a small window, or just want sessions to stay predictable.
 
 ## Install
 
-Copy (or symlink) the plugin files into your OpenCode plugins directory:
+Clone the repository into your OpenCode plugins directory so the checkout *is* the
+installed plugin:
 
 ```sh
-git clone https://github.com/catronomix/opencode-ctx-limit.git
+git clone https://github.com/catronomix/opencode-ctx-limit.git ~/.config/opencode/plugins/ctx-limit
 ```
 
-Then, in `~/.config/opencode/opencode.json(c)`, load both the server and terminal entry
-points:
+Plugins under `~/.config/opencode/plugins/<name>/` load automatically — no `opencode.json(c)`
+entry is needed. The directory exposes three parts through its `package.json` `exports`:
+
+| Export  | File       | Runs in        | Role                                         |
+| ------- | ---------- | -------------- | -------------------------------------------- |
+| `.`     | `index.ts` | OpenCode server | Enforcement, persistence, RPC implementation |
+| `./tui` | `tui.ts`   | Terminal UI    | Menu, slash command, RPC client              |
+| `./rpc` | `rpc.ts`   | Shared         | Typed RPC contract                           |
+
+If you keep the clone somewhere else, add the plugin **directory** (not individual files) to
+`plugins` in `~/.config/opencode/opencode.json(c)`:
 
 ```jsonc
 {
-  "plugins": [
-    "~/.config/opencode/plugins/ctx-limit/index.ts",
-    "~/.config/opencode/plugins/ctx-limit/tui.ts"
-  ]
+  "plugins": ["/home/you/src/opencode-ctx-limit"]
 }
 ```
 
-`index.ts` is the server-side plugin (enforcement + persistence), `tui.ts` is the terminal
-plugin (menu + slash command). Both are required for the menu; enforcement works on its own.
+One entry loads every part. Both parts are required for the menu; enforcement works on its
+own. If only the terminal part is running, changing the cap reports that the server part is
+not loaded instead of failing silently.
+
+To update:
+
+```sh
+git -C ~/.config/opencode/plugins/ctx-limit pull
+```
 
 ## Usage
 
@@ -64,6 +78,17 @@ tokenizer, so leave headroom for real tokenizers.
 
 Settings sync across windows through the plugin RPC channel (`rpc.ts`), so changing the cap
 in one window updates the others.
+
+## Troubleshooting
+
+`Global context limit — The ctx-limit server part is not running at this location` means the
+terminal part loaded but the server part did not, so there is no RPC to change the cap. Check
+`GET /api/plugin` (via `opencode api get /api/plugin`) for an active `ctx-limit` entry with
+`server`, `tui`, and `rpc` features, and read the server log at
+`~/.local/share/opencode/log/opencode.log`.
+
+Any other message here is the real error text returned by the server, including its RPC error
+type.
 
 ## Development
 

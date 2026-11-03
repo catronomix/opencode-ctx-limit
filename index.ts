@@ -77,9 +77,19 @@ export default Plugin.define({
     const commit = async (limit: number) => {
       settings.limit = limit
       await ctx.storage.set(STORAGE_KEY, settings)
-      // Rebuild the model registry so transform-based caps are up to date.
-      await ctx.model.reload()
-      await registration?.events.emit("changed", { limit: settings.limit })
+      // The cap is saved and enforced from the next request on, so a failing
+      // reload or broadcast must not make the menu report the change as lost.
+      try {
+        // Rebuild the model registry so transform-based caps are up to date.
+        await ctx.model.reload()
+      } catch (error) {
+        console.error("ctx-limit: could not reload the model registry", error)
+      }
+      try {
+        await registration?.events.emit("changed", { limit: settings.limit })
+      } catch (error) {
+        console.error("ctx-limit: could not broadcast the new cap", error)
+      }
       return { limit: settings.limit }
     }
 

@@ -1,5 +1,6 @@
 import { Plugin } from "@opencode/plugin/tui"
 
+import { describeError, describeLimitError } from "./logic.ts"
 import { CtxLimit } from "./rpc.ts"
 
 const MIN_LIMIT = 4096
@@ -45,7 +46,7 @@ export default Plugin.define({
           draft.limit = Number(result?.limit ?? 0) || 0
         })
       } catch (error) {
-        console.error("ctx-limit: could not read the current cap", error)
+        console.error("ctx-limit: could not read the current cap", describeError(error, "unknown error"), error)
       }
     }
 
@@ -73,9 +74,10 @@ export default Plugin.define({
           variant: "success",
         })
       } catch (error) {
+        console.error("ctx-limit: could not update the cap", describeError(error, "unknown error"), error)
         context.ui.toast.show({
           title: "Global context limit",
-          message: error instanceof Error ? error.message : "Could not update the cap",
+          message: describeLimitError(error),
           variant: "error",
         })
       }

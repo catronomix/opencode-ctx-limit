@@ -1,6 +1,6 @@
 {
   "name": "ctx-limit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCode plugin that caps the context window of every model with one global token limit.",
   "type": "module",
   "license": "MIT",
@@ -10,6 +10,11 @@
     "context-window",
     "tokens"
   ],
+  "exports": {
+    ".": "./index.ts",
+    "./tui": "./tui.ts",
+    "./rpc": "./rpc.ts"
+  },
   "files": [
     "index.ts",
     "logic.ts",
@@ -22,6 +27,9 @@
   },
   "engines": {
     "node": ">=22.6"
+  },
+  "dependencies": {
+    "@opencode/plugin": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

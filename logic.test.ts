@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { estimateTokens, inputBudget, outputBudget, trimMessages, type Message } from "./logic.ts"
+import { describeError, describeLimitError, estimateTokens, inputBudget, outputBudget, trimMessages, type Message } from "./logic.ts"
 
 const text = (value: string): Message => ({ role: "user", content: [{ type: "text", text: value }] })
 
@@ -59,4 +59,27 @@ test("trimMessages handles a conversation without user turns", () => {
   const messages: Message[] = [{ role: "system", content: [{ type: "text", text: "x".repeat(4_000) }] }]
   const result = trimMessages(messages, 10)
   assert.equal(result.dropped, 0)
+})
+
+test("describeError reads messages from RPC plain objects, not just Error", () => {
+  assert.equal(describeError(new Error("boom")), "boom")
+  assert.equal(describeError({ type: "rpc.invalid_input", message: "Expected object" }), "Expected object (rpc.invalid_input)")
+  assert.equal(describeError({ type: "rpc.internal", message: "" }), "rpc.internal")
+  assert.equal(describeError("nope"), "nope")
+  assert.equal(describeError(undefined, "fallback"), "fallback")
+})
+
+test("describeLimitError explains a missing server part", () => {
+  const unavailable = describeLimitError({
+    type: "rpc.unavailable",
+    message: "RPC is unavailable: ctx-limit",
+  })
+  assert.match(unavailable, /server part is not running/)
+  assert.match(unavailable, /RPC is unavailable: ctx-limit/)
+
+  assert.equal(
+    describeLimitError({ type: "rpc.invalid_input", message: "Expected a value greater than or equal to 4096" }),
+    "Expected a value greater than or equal to 4096 (rpc.invalid_input)",
+  )
+  assert.equal(describeLimitError(undefined), "Could not update the cap")
 })

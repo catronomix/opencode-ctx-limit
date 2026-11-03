@@ -51,6 +51,34 @@ export function trimMessages(messages: Message[], budget: number): { messages: M
   return { messages: messages.slice(cut), dropped: cut }
 }
 
+/**
+ * Human-readable text for an unknown rejection. RPC calls from the terminal
+ * plugin reject with plain `{ type, message, data? }` objects rather than
+ * `Error` instances, so `instanceof Error` alone loses every useful detail.
+ */
+export function describeError(error: unknown, fallback = "Unknown error"): string {
+  if (error instanceof Error) return error.message || fallback
+  if (typeof error === "string" && error) return error
+  if (error && typeof error === "object") {
+    const { message, type } = error as { message?: unknown; type?: unknown }
+    const label = typeof type === "string" && type ? type : undefined
+    if (typeof message === "string" && message) return label ? `${message} (${label})` : message
+    if (label) return label
+  }
+  return fallback
+}
+
+/** Explain a failed cap change, including when the server part is not loaded. */
+export function describeLimitError(error: unknown): string {
+  const fallback = "Could not update the cap"
+  const detail = describeError(error, fallback)
+  const type = error && typeof error === "object" ? (error as { type?: unknown }).type : undefined
+  if (type === "rpc.unavailable") {
+    return `The ctx-limit server part is not running at this location, so the cap cannot be changed. ${detail}`
+  }
+  return detail
+}
+
 /** Input tokens allowed for messages once output and the system prompt are paid for. */
 export function inputBudget(cap: number, output: number, systemTokens: number): number {
   return Math.max(MIN_INPUT, cap - output - systemTokens)
