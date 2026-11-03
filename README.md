@@ -22,7 +22,7 @@ local models with a small window, or just want sessions to stay predictable.
 Copy (or symlink) the plugin files into your OpenCode plugins directory:
 
 ```sh
-git clone https://github.com/catronomix/ctx-limit.git
+git clone https://github.com/catronomix/opencode-ctx-limit.git
 ```
 
 Then, in `~/.config/opencode/opencode.json(c)`, load both the server and terminal entry
