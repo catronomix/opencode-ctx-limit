@@ -261,6 +261,16 @@ npm pack && npm i -g ./catronomix-opencode-*.tgz   # or into a clean temp dir
   The authoritative signal is the server log line
   `msg="loading plugin" ... entrypoint=file:///...`, which names the exact file
   it imported. `opencode service restart` or `/reload` settles the table.
+- **`--standalone` proves the code imports, not that the running server has
+  it.** A long-lived server can keep serving a registry from before your last
+  edit and silently omit the plugin, while a standalone run loads it fine.
+  Check `opencode api get /api/plugin` for the entry with
+  `state.status: active`; if it is missing, restart the service. That endpoint
+  also reports the resolved `source.path` (checkout vs package cache), which is
+  the quickest way to tell which copy is actually running.
+- **npm < 12 has no `stage` command.** `npm stage publish` needs npm 12+; on an
+  older npm the only options are `npm publish` (needs an OTP or a 2FA-bypassing
+  token) or `npx -y npm@12 stage publish`. Stage ids expire after 7 days.
 - **Private registries and mirrors exist** (GitHub Packages, Verdaccio,
   Artifactory, corporate proxies) and are opt-in via `.npmrc`. Public npm needs
   no account to *install* — only to publish.
