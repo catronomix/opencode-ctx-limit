@@ -1,42 +1,62 @@
 # ctx-limit
 
-An [OpenCode](https://opencode.ai) plugin that puts **one global token cap** on every model.
+**One token cap for every model, in every session.**
 
-A single shared limit applies to every provider and model: whichever model a session
-uses, it never plans for more context than the cap. Useful when you pay per token, run
-local models with a small window, or just want sessions to stay predictable.
+An [OpenCode](https://opencode.ai) plugin that puts a single global context limit on
+everything you run. Whichever provider or model a session uses, it never plans for more
+context than the cap you set. Useful when you pay per token, run local models with a small
+window, or just want sessions to stay predictable.
 
-## Features
+```
+/ctxmax 128k   →   Global context limit — Models capped at 128k tokens.
+```
 
-- **Global cap** — one number, all models. Stored per machine, not per project.
-- **Request-time enforcement** — the cap is applied to the payload that is actually
-  sent, so it works even for models that pin `limit` in their config and ignore transforms.
-- **Turn-aware trimming** — oldest turns are dropped whole from the front, so assistant
-  tool calls never get separated from their tool results. The newest turn is always kept.
-- **Output budgeting** — `maxTokens` becomes `min(configured, cap / 4)`, clamped to
-  1k–32k, so output never starves the input budget.
-- **Instant control from the TUI** — `⌘K` palette commands and the `/ctxmax` slash command.
+---
+
+## Why
+
+- **Global, not per model.** One number, all providers, all models. No config edits per
+  model, no provider-specific settings.
+- **Enforced on the request itself.** OpenCode applies `limit` from model config in ways a
+  registry transform can't always reach, so the cap is also applied to the exact payload
+  about to be sent.
+- **Turn-aware trimming.** Oldest turns are dropped whole from the front, so an assistant
+  tool call is never separated from its tool result. The newest turn is always kept.
+- **Honest output budgets.** Output becomes `min(configured, cap / 4)`, clamped to
+  1k–32k tokens, so generation can't starve the input budget.
+- **Instant control.** Palette commands, a `/ctxmax` slash command, and presets. Change it
+  in one window and the others follow.
 
 ## Install
 
-Clone the repository into your OpenCode plugins directory so the checkout *is* the
-installed plugin:
+Published as `@catronomix/opencode-ctx-limit` on npm:
 
 ```sh
-git clone https://github.com/catronomix/opencode-ctx-limit.git ~/.config/opencode/plugins/ctx-limit
+opencode plugin add @catronomix/opencode-ctx-limit@0.1.3
 ```
 
-Plugins under `~/.config/opencode/plugins/<name>/` load automatically — no `opencode.json(c)`
-entry is needed. The directory exposes three parts through its `package.json` `exports`:
+Or add it to `plugins` in `~/.config/opencode/opencode.json(c)` yourself:
 
-| Export  | File       | Runs in        | Role                                         |
-| ------- | ---------- | -------------- | -------------------------------------------- |
-| `.`     | `index.ts` | OpenCode server | Enforcement, persistence, RPC implementation |
-| `./tui` | `tui.ts`   | Terminal UI    | Menu, slash command, RPC client              |
-| `./rpc` | `rpc.ts`   | Shared         | Typed RPC contract                           |
+```jsonc
+{
+  "plugins": ["@catronomix/opencode-ctx-limit@0.1.3"]
+}
+```
 
-If you keep the clone somewhere else, add the plugin **directory** (not individual files) to
-`plugins` in `~/.config/opencode/opencode.json(c)`:
+One entry loads every part. Pin the exact version, drop `@0.1.3` to track releases, or use
+`github:catronomix/opencode-ctx-limit` to install straight from git.
+
+### From a local checkout
+
+Cloning works too — the checkout *is* the installed plugin:
+
+```sh
+git clone https://github.com/catronomix/opencode-ctx-limit.git \
+  ~/.config/opencode/plugins/ctx-limit
+```
+
+Plugins under `~/.config/opencode/plugins/<name>/` load automatically. Anywhere else, add
+the **directory** (not individual files) to `plugins`:
 
 ```jsonc
 {
@@ -44,66 +64,99 @@ If you keep the clone somewhere else, add the plugin **directory** (not individu
 }
 ```
 
-One entry loads every part. Both parts are required for the menu; enforcement works on its
-own. If only the terminal part is running, changing the cap reports that the server part is
-not loaded instead of failing silently.
+Use either the package entry or the path entry, never both: two entries for one plugin ID
+give you two instances fighting over the same hooks.
 
-The same layout works per project: clone into `<project>/.opencode/plugins/ctx-limit`. Each
-location stores its own cap, and a session only reacts to cap changes made at its own
-location (RPC events are broadcast server-wide).
+### Parts
 
-To update:
+| Export  | File       | Runs in         | Role                                         |
+| ------- | ---------- | --------------- | -------------------------------------------- |
+| `.`     | `index.ts` | OpenCode server | Enforcement, persistence, RPC implementation |
+| `./tui` | `tui.ts`   | Terminal UI     | Menu, slash command, RPC client              |
+| `./rpc` | `rpc.ts`   | Shared          | Typed RPC contract                           |
 
-```sh
-git -C ~/.config/opencode/plugins/ctx-limit pull
-```
+Enforcement works with the server part alone; the menu needs the terminal part as well. If
+only the terminal part is loaded, changing the cap says so instead of failing silently.
 
 ## Usage
 
-- Palette (`⌘K` → **Context**): **Set global max context** / **Clear global max context**
-- Slash command: `/ctxmax 128k`, `/ctxmax 200000`, or just `/ctxmax` for a picker
-- Presets: 64k, 100k, 128k, 160k, 200k, 256k, plus custom and "no limit"
+| Action  | How                                                     |
+| ------- | ------------------------------------------------------- |
+| Set     | `/ctxmax 128k`, `/ctxmax 200000`, or `/ctxmax` to pick  |
+| Presets | 64k, 100k, 128k, 160k, 200k, 256k, custom, or no limit  |
+| Clear   | `/ctxmax` → **No limit**, or the palette's **Clear**    |
 
-The command accepts raw token counts and `k`/`m` suffixes. The minimum is 4096 tokens;
-setting "no limit" returns every model to its configured context window.
+The command accepts raw counts and `k`/`m` suffixes. The minimum is 4096 tokens. Clearing
+the cap returns every model to its configured context window.
+
+Palette (`⌘K` → **Context**): **Set global max context** / **Clear global max context**.
 
 ## How it works
 
-Two layers, because OpenCode models behave differently:
+Two layers, because model config in OpenCode wins over registry transforms:
 
-1. `ctx.model.transform` clamps every model registry entry whose `limit.context` or
-   `limit.output` exceeds the cap. Models that pin `limit` in config ignore this, so…
-2. `ctx.session.hook("context")` enforces the cap on the final request: it recomputes the
-   output budget, subtracts the estimated system prompt, and trims old turns until the
-   tail fits.
+1. `ctx.model.transform` clamps every registry entry whose `limit.context` or `limit.output`
+   exceeds the cap, so the UI and planning phases see the capped number.
+2. `ctx.session.hook("context")` re-applies the cap to the final request: recompute the
+   output budget, subtract the estimated system prompt, then trim old turns until the tail
+   fits.
 
 Token counts are a cheap provider-agnostic estimate (~4 characters per token), not a
-tokenizer, so leave headroom for real tokenizers.
+tokenizer, so leave headroom for whatever tokenizer your provider actually uses.
 
-Settings sync across windows through the plugin RPC channel (`rpc.ts`), so changing the cap
-in one window updates the others in the same location.
+The hook computes everything before touching the request and passes the payload through
+unchanged if anything fails — a plugin bug can cost you the cap, never the request.
+
+## Security posture
+
+- No network access, no filesystem access, no subprocesses, no `eval`.
+- The only state is one number in OpenCode's own plugin storage.
+- Settings changes travel over the plugin RPC channel, not the internet.
+- Trimming is logged once per session:
+  `ctx-limit: trimmed N message(s) to fit the M token cap`.
+
+See [`PUBLISH-GUIDE.md`](PUBLISH-GUIDE.md) for how the package is built and published.
 
 ## Troubleshooting
 
-`Global context limit — The ctx-limit server part is not running at this location` means the
-terminal part loaded but there was no `ctx-limit` server part at the location the request was
-addressed to. The plugin always sends its own `location` with each RPC call, so this normally
-means the server part failed during setup. Check `GET /api/plugin` (via
-`opencode api get /api/plugin`) for an active `ctx-limit` entry with `server`, `tui`, and `rpc`
-features, and read the server log at `~/.local/share/opencode/log/opencode.log`.
+**“The ctx-limit server part is not running at this location”** — the terminal part loaded
+but no `ctx-limit` server part was found at the location the request was addressed to. The
+plugin always sends its own `location` with each RPC call, so this normally means setup
+failed server-side. Check `opencode api get /api/plugin` for a `ctx-limit` entry with
+`server`, `tui` and `rpc` features, then read
+`~/.local/share/opencode/log/opencode.log`.
 
-Any other message here is the real error text returned by the server, including its RPC error
-type.
+Any other message is the server's real error text, including its RPC error type.
+
+**The cap looks higher than the model claims.** Config-pinned `limit` values are clamped by
+the transform but can still be displayed from config in some views. The request hook is what
+actually enforces the cap.
+
+**`opencode plugin list` doesn't show it.** That table lags behind config and package
+changes. The server log line `msg="loading plugin" … entrypoint=file:///…` is the truth;
+`/reload` or `opencode service restart` settles the table.
 
 ## Development
 
 ```sh
-node --test logic.test.ts   # pure helper tests
-npx tsc --noEmit            # typecheck
+npm install
+npm test          # node --test logic.test.ts
+npm run typecheck # tsc --noEmit
 ```
 
-`logic.ts` has no OpenCode imports on purpose — it is the testable core.
+`logic.ts` has no OpenCode imports on purpose — it is the testable core, and the only place
+where the token math lives.
+
+## Disclaimer
+
+This plugin was **built with OpenCode** — designed, written and reviewed in collaboration
+with an AI coding agent, then audited for security and behaviour before publishing.
+
+It is a hobby project provided as-is under the MIT licence: no warranty, no support
+guarantee, and no affiliation with the OpenCode team. It does mutate the payloads your
+sessions send, so read the source before trusting it in a workflow you can't afford to
+lose. It is deliberately small enough to read in one sitting.
 
 ## License
 
-MIT
+MIT © 2026 catronomix
