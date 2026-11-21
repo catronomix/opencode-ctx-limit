@@ -36,14 +36,14 @@ window, or just want sessions to stay predictable.
 Published as `@catronomix/opencode-ctx-limit` on npm:
 
 ```sh
-opencode plugin add @catronomix/opencode-ctx-limit@0.2.0
+opencode plugin add @catronomix/opencode-ctx-limit
 ```
 
 Or add it to `plugins` in `~/.config/opencode/opencode.json(c)` yourself:
 
 ```jsonc
 {
-  "plugins": ["@catronomix/opencode-ctx-limit@0.2.0"]
+  "plugins": ["@catronomix/opencode-ctx-limit"]
 }
 ```
 
