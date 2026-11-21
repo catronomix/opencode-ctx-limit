@@ -94,7 +94,13 @@ export function sameDirectory(a: unknown, b: unknown): boolean {
   return windows ? left.toLowerCase() === right.toLowerCase() : left === right
 }
 
-/** Input tokens allowed for messages once output and the system prompt are paid for. */
+/**
+ * Input tokens allowed for messages once output and the system prompt are paid
+ * for. The result never exceeds `cap`, even when the system prompt alone would
+ * overflow it: the 1k floor is itself clamped to the cap.
+ */
 export function inputBudget(cap: number, output: number, systemTokens: number): number {
-  return Math.max(MIN_INPUT, cap - output - systemTokens)
+  const remaining = cap - output - systemTokens
+  const floor = Math.min(MIN_INPUT, cap)
+  return Math.max(0, Math.min(Math.max(remaining, floor), cap))
 }

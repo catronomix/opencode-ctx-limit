@@ -24,6 +24,20 @@ test("inputBudget keeps a floor and subtracts output plus system", () => {
   assert.equal(inputBudget(4_096, 1_024, 10_000), 1_024)
 })
 
+test("inputBudget never exceeds the cap", () => {
+  for (const [cap, output, system] of [
+    [4_096, 1_024, 10_000],
+    [2_000, 1_900, 500],
+    [8_192, 8_192, 0],
+    [100_000, 25_000, 200_000],
+    [4_096, 0, 0],
+  ] as const) {
+    const budget = inputBudget(cap, output, system)
+    assert.ok(budget <= cap, `budget ${budget} must not exceed cap ${cap}`)
+    assert.ok(budget >= 0, `budget ${budget} must not be negative`)
+  }
+})
+
 test("trimMessages leaves a fitting conversation untouched", () => {
   const messages = [text("a".repeat(40)), text("b".repeat(40))]
   const result = trimMessages(messages, 1_000)

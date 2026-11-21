@@ -43,28 +43,44 @@ export default Plugin.define({
     })
 
     const trimmedSessions = new Set<string>()
+    const MAX_TRACKED_SESSIONS = 64
 
     // Request-time enforcement: the cap is applied to the exact payload about
     // to be sent, so it works whatever `limit` the model config declares. Reads
     // `settings.limit` live, so a new cap applies from the next request on.
+    // Everything is computed before the event is touched, and any failure leaves
+    // the payload exactly as OpenCode built it: a bug here must never block a
+    // request.
     await ctx.session.hook("context", (event) => {
       const cap = settings.limit
       if (!cap) return
+      try {
+        const configured = typeof event.options.maxTokens === "number" ? event.options.maxTokens : undefined
+        const output = outputBudget(cap, configured)
+        const incoming = event.messages
+        if (!Array.isArray(incoming)) {
+          event.options.maxTokens = output
+          return
+        }
+        const budget = inputBudget(cap, output, estimateTokens(event.system))
+        const { messages, dropped } = trimMessages(incoming as Message[], budget)
 
-      const configured = typeof event.options.maxTokens === "number" ? event.options.maxTokens : undefined
-      const output = outputBudget(cap, configured)
-      event.options.maxTokens = output
+        event.options.maxTokens = output
+        if (!dropped) return
 
-      const budget = inputBudget(cap, output, estimateTokens(event.system))
-      const { messages, dropped } = trimMessages(event.messages as Message[], budget)
-      if (!dropped) return
-
-      event.messages = messages as typeof event.messages
-      if (trimmedSessions.has(event.sessionID)) return
-      trimmedSessions.add(event.sessionID)
-      console.error(
-        `ctx-limit: trimmed ${dropped} message(s) to fit the ${cap} token cap (output ${output})`,
-      )
+        event.messages = messages as typeof event.messages
+        if (trimmedSessions.has(event.sessionID)) return
+        trimmedSessions.add(event.sessionID)
+        if (trimmedSessions.size > MAX_TRACKED_SESSIONS) {
+          const oldest = trimmedSessions.values().next().value
+          if (oldest !== undefined) trimmedSessions.delete(oldest)
+        }
+        console.error(
+          `ctx-limit: trimmed ${dropped} message(s) to fit the ${cap} token cap (output ${output})`,
+        )
+      } catch (error) {
+        console.error("ctx-limit: could not apply the cap, sending the request unchanged", error)
+      }
     })
 
     if (!ctx.rpc) {
