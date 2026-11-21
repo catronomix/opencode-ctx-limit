@@ -82,14 +82,31 @@ export function describeLimitError(error: unknown): string {
 /**
  * Compare two location directories. RPC events are broadcast to every
  * location on the server, so listeners must ignore events from elsewhere.
- * Windows paths are case-insensitive and either separator is accepted.
+ * `.` and `..` segments are resolved and either separator is accepted, so an
+ * equivalent path written differently still matches. Windows paths are
+ * case-insensitive.
  */
 export function sameDirectory(a: unknown, b: unknown): boolean {
   if (typeof a !== "string" || typeof b !== "string") return false
-  const normalize = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "")
+  const normalize = (raw: string): string => {
+    const path = raw.replace(/\\/g, "/")
+    const absolute = path.startsWith("/")
+    const parts: string[] = []
+    for (const part of path.split("/")) {
+      if (!part || part === ".") continue
+      if (part === "..") {
+        // Never pop past a POSIX root or a Windows drive prefix.
+        const atRoot = parts.length === 0 || (parts.length === 1 && /^[a-zA-Z]:$/.test(parts[0]))
+        if (!atRoot) parts.pop()
+        continue
+      }
+      parts.push(part)
+    }
+    return absolute ? `/${parts.join("/")}` : parts.join("/")
+  }
   const left = normalize(a)
   const right = normalize(b)
-  if (!left || !right) return false
+  if (!left || !right || left === "/" || right === "/") return false
   const windows = /^[a-zA-Z]:\//.test(left) || /^[a-zA-Z]:\//.test(right)
   return windows ? left.toLowerCase() === right.toLowerCase() : left === right
 }

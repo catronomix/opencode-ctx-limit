@@ -144,6 +144,10 @@ npm test          # node --test logic.test.ts
 npm run typecheck # tsc --noEmit
 ```
 
+The test runner relies on Node's native type stripping, so development needs Node
+22.6+ (`engines` describes that, not the plugin's runtime, which is the Bun-based
+OpenCode host).
+
 `logic.ts` has no OpenCode imports on purpose — it is the testable core, and the only place
 where the token math lives.
 

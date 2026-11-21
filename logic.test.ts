@@ -85,6 +85,17 @@ test("sameDirectory ignores events from other locations", () => {
   assert.equal(sameDirectory(undefined, "/home/me/project"), false)
 })
 
+test("sameDirectory resolves dot segments and redundant separators", () => {
+  assert.equal(sameDirectory("C:/GITHUB/./opencode-ctx-limit", "C:\\GITHUB\\opencode-ctx-limit"), true)
+  assert.equal(sameDirectory("C:/GITHUB/x/../opencode-ctx-limit", "C:/GITHUB/opencode-ctx-limit"), true)
+  assert.equal(sameDirectory("/home/me/../me/project", "/home/me/project"), true)
+  assert.equal(sameDirectory("//var//lib///volumes//", "/var/lib/volumes"), true)
+  assert.equal(sameDirectory("C:/GITHUB/opencode-ctx-limit/..", "C:/GITHUB"), true)
+  assert.equal(sameDirectory("C:/..", "D:/"), false)
+  assert.equal(sameDirectory("/", "/"), false)
+  assert.equal(sameDirectory("/home/me/../other", "/home/me/project"), false)
+})
+
 test("describeError reads messages from RPC plain objects, not just Error", () => {
   assert.equal(describeError(new Error("boom")), "boom")
   assert.equal(describeError({ type: "rpc.invalid_input", message: "Expected object" }), "Expected object (rpc.invalid_input)")
