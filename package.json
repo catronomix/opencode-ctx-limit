@@ -1,6 +1,6 @@
 {
   "name": "@catronomix/opencode-ctx-limit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publishConfig": {
     "access": "public"
   },
@@ -23,6 +23,7 @@
     "./rpc": "./rpc.ts"
   },
   "files": [
+    "define.ts",
     "index.ts",
     "logic.ts",
     "rpc.ts",
@@ -34,9 +35,6 @@
   },
   "engines": {
     "node": ">=22.6"
-  },
-  "peerDependencies": {
-    "@opencode/plugin": ">=2.0.0 <3"
   },
   "devDependencies": {
     "@opencode/plugin": "^2.3.2",

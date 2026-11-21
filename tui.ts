@@ -1,5 +1,4 @@
-import { Plugin } from "@opencode/plugin/tui"
-
+import { defineTuiPlugin } from "./define.ts"
 import { describeError, describeLimitError, sameDirectory } from "./logic.ts"
 import { CtxLimit } from "./rpc.ts"
 
@@ -27,7 +26,7 @@ function parse(text: string | undefined) {
 
 type Limit = { limit: number }
 
-export default Plugin.define({
+export default defineTuiPlugin({
   id: "ctx-limit.tui",
   async setup(context) {
     // Every RPC call must name the location this plugin instance runs in.

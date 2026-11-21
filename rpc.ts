@@ -1,4 +1,4 @@
-import { Rpc } from "@opencode/plugin/rpc"
+import { defineRpc } from "./define.ts"
 
 const limitSchema = {
   type: "object",
@@ -20,7 +20,7 @@ const noInput = {
  * (tui.ts). `limit` is the global max context cap in tokens; 0 means "no cap"
  * (every model keeps its configured limit).
  */
-export const CtxLimit = Rpc.define({
+export const CtxLimit = defineRpc({
   id: "ctx-limit",
   methods: {
     get: { input: noInput, output: limitSchema },

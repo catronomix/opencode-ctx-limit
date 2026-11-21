@@ -1,5 +1,4 @@
-import { Plugin } from "@opencode/plugin"
-
+import { definePlugin } from "./define.ts"
 import { estimateTokens, inputBudget, outputBudget, shrinkMessages, trimMessages, type Message } from "./logic.ts"
 import { CtxLimit } from "./rpc.ts"
 
@@ -14,7 +13,7 @@ function sanitize(value: unknown): number {
   return limit >= MIN_LIMIT ? limit : 0
 }
 
-export default Plugin.define({
+export default definePlugin({
   id: "ctx-limit",
   async setup(ctx) {
     const stored = (await ctx.storage.get(STORAGE_KEY)) as Partial<Settings> | undefined

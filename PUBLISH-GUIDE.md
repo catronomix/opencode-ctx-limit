@@ -154,9 +154,13 @@ Rules:
 - `dist/` is **not committed**. It is a build artifact; add it to `.gitignore`.
   CI or `prepack` produces it, and `npm pack --dry-run` proves what ships.
 - `prepack` runs the build so a publish can never ship a stale or missing `dist`.
-- `@opencode/plugin` is a `peerDependency`, never a `dependency`. So are
-  `@opentui/core`, `@opentui/solid`, and `solid-js`: the host provides them, and
-  a bundled second copy breaks the TUI reconciler in ways that look like your bug.
+- `@opencode/plugin` is never a `dependency`. Prefer importing it **for types only**
+  and keeping a local shim for the runtime helpers you need (see `define.ts`):
+  `Plugin.define` and `Rpc.define` are pure, so the package ships with zero
+  dependencies and no inherited Socket/npm alerts. Keep a peerDependency only
+  when you genuinely call into SDK code at runtime — and note that a peer of
+  `@opencode/plugin` drags its whole tree (`effect`, `@opencode/*`, `solid-js`)
+  into a consumer's dependency graph for auditing.
 - Keep real versions in `devDependencies` so local typecheck and tests resolve
   the same API the host will.
 
@@ -217,7 +221,8 @@ npm pack && npm i -g ./catronomix-opencode-*.tgz   # or into a clean temp dir
 - [ ] `publishConfig.access` is `"public"`.
 - [ ] `"private": true` removed.
 - [ ] `exports`, `main`, `types`, `files` all reference `dist/`.
-- [ ] `@opencode/plugin` and TUI deps are `peerDependencies`.
+- [ ] `@opencode/plugin` is a `devDependency` (types only) or a justified
+      `peerDependency`; `npm ls --omit=dev` shows no runtime dependencies.
 - [ ] `dist/` is gitignored; `prepack` builds it.
 - [ ] `npm test`, `npm run typecheck`, `npm run build` all green.
 - [ ] `npm pack --dry-run` shows only `dist`, `LICENSE`, `README.md`,
@@ -244,6 +249,10 @@ npm pack && npm i -g ./catronomix-opencode-*.tgz   # or into a clean temp dir
   `.devteam`, screenshots and lockfiles all get packed.
 - **`"@opencode/plugin": "latest"` as a runtime dependency is wrong.** It is
   unpinned and can install a second copy of the plugin SDK next to the host's.
+- **A peer `@opencode/plugin` makes your package look risky.** Socket resolves
+  the peer's tree and reports its alerts (network/shell/fs/env access, CVEs) as
+  *your* dependency alerts, even though your own code is clean. Types-only use
+  plus local shims avoids that entirely.
 - **Version skew across plugin and host.** A plugin built against an older
   `@opencode/plugin` can break after an OpenCode update. Test the installed
   package, not a workspace link.

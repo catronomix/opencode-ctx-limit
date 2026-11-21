@@ -128,6 +128,10 @@ unchanged if anything fails — a plugin bug can cost you the cap, never the req
 ## Security posture
 
 - No network access, no filesystem access, no subprocesses, no `eval`.
+- Zero dependencies. `@opencode/plugin` is imported for types only; the two
+  runtime helpers it provided (`Plugin.define`, `Rpc.define`, both identity /
+  validation no-ops in the SDK) live in [`define.ts`](define.ts), so installing
+  this package adds nothing else to your tree.
 - The only state is one number in OpenCode's own plugin storage.
 - Settings changes travel over the plugin RPC channel, not the internet.
 - No hidden model calls: shrinking is local string work, never a summarisation request.
@@ -168,7 +172,8 @@ The test runner relies on Node's native type stripping, so development needs Nod
 OpenCode host).
 
 `logic.ts` has no OpenCode imports on purpose — it is the testable core, and the only place
-where the token math lives.
+where the token math lives. `define.ts` holds the local `define` shims; it reaches the SDK
+only through type-only imports, which is what keeps the published package dependency-free.
 
 ## Disclaimer
 
