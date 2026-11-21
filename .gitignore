@@ -1,3 +1,19 @@
+# dependencies
 node_modules/
+
+# build, test and pack artifacts
+dist/
+coverage/
+*.tsbuildinfo
+*.tgz
+
+# logs and editor noise
 *.log
 .DS_Store
+
+# local secrets — never commit, never ship
+.env
+.env.*
+!.env.example
+*.pem
+keys.env
