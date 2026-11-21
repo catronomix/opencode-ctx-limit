@@ -138,7 +138,8 @@ unchanged if anything fails — a plugin bug can cost you the cap, never the req
 - Shrinking and trimming are logged once per session:
   `ctx-limit: elided N message(s) of tool output, dropped M old message(s) to fit the K token cap`.
 
-See [`PUBLISH-GUIDE.md`](PUBLISH-GUIDE.md) for how the package is built and published.
+Publishing and metadata rules are kept in the shared guide at
+`C:\GITHUB\PUBLISH-GUIDE.md` (parent folder, not tracked in this repo).
 
 ## Troubleshooting
 

@@ -1,12 +1,17 @@
 {
   "name": "@catronomix/opencode-ctx-limit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publishConfig": {
     "access": "public"
   },
   "description": "OpenCode plugin that caps the context window of every model with one global token limit.",
   "type": "module",
   "license": "MIT",
+  "author": "Innocent Coppieters",
+  "homepage": "https://github.com/catronomix/",
+  "bugs": {
+    "url": "https://github.com/catronomix/opencode-ctx-limit/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/catronomix/opencode-ctx-limit.git"

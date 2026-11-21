@@ -11,6 +11,9 @@ coverage/
 *.log
 .DS_Store
 
+# shared publishing guide lives in the parent folder (C:\GITHUB\PUBLISH-GUIDE.md)
+PUBLISH-GUIDE.md
+
 # local secrets — never commit, never ship
 .env
 .env.*
