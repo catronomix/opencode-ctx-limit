@@ -255,6 +255,12 @@ npm pack && npm i -g ./catronomix-opencode-*.tgz   # or into a clean temp dir
   plugins in the global `opencode.json(c)`.
 - **Dev and installed copies are independent.** After publishing, a stale local
   checkout does nothing. Remove the path entry when you switch to the package.
+- **`opencode plugin list` lags and is not ground truth.** After editing
+  `package.json` or the `plugins` array it can keep omitting a plugin, or show
+  two rows for the same ID with different sources, until the server reloads.
+  The authoritative signal is the server log line
+  `msg="loading plugin" ... entrypoint=file:///...`, which names the exact file
+  it imported. `opencode service restart` or `/reload` settles the table.
 - **Private registries and mirrors exist** (GitHub Packages, Verdaccio,
   Artifactory, corporate proxies) and are opt-in via `.npmrc`. Public npm needs
   no account to *install* — only to publish.
