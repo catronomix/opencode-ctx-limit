@@ -121,3 +121,117 @@ export function inputBudget(cap: number, output: number, systemTokens: number): 
   const floor = Math.min(MIN_INPUT, cap)
   return Math.max(0, Math.min(Math.max(remaining, floor), cap))
 }
+
+/* ------------------------------------------------------------------ *
+ * Shrinking: give up the cheapest context first.
+ *
+ * Trimming user turns is the last resort, not the first. Before a single
+ * message is dropped, three passes try to pay for the budget out of material
+ * the model rarely needs verbatim: oversized tool output, tool output that was
+ * already read later in the session, and prose from older assistant turns.
+ *
+ * Every pass is pure, deterministic, and never touches a `user` message or a
+ * tool-call part, so assistant tool calls stay paired with their results.
+ * ------------------------------------------------------------------ */
+
+/** Tool output longer than this is a candidate for elision. */
+const SHRINK_TOOL_CHARS = 4_000
+/** Elided tool output keeps this much of the head… */
+const KEEP_HEAD = 1_200
+/** …and this much of the tail, where errors and summaries usually land. */
+const KEEP_TAIL = 800
+/** Duplicate detection ignores tool output shorter than this. */
+const DEDUPE_MIN_CHARS = 200
+/** Older assistant prose is cut to this many characters. */
+const SHRINK_ASSISTANT_CHARS = 400
+/** Only assistant text longer than this is worth cutting. */
+const SHRINK_ASSISTANT_MIN = 800
+
+/**
+ * `1` elides oversized tool output, `2` additionally elides repeated tool
+ * output, `3` additionally shortens prose in older assistant turns. Callers
+ * escalate one level at a time and stop as soon as the payload fits.
+ */
+export type ShrinkLevel = 1 | 2 | 3
+
+export type ShrinkResult = { messages: Message[]; elided: number }
+
+const elide = (text: string, head: number, tail: number, note: string): string => {
+  const marker = `\n… [ctx-limit: ${note}] …\n`
+  return tail > 0 ? `${text.slice(0, head)}${marker}${text.slice(-tail)}` : `${text.slice(0, head)}${marker}`
+}
+
+const copyMessage = (message: Message, content: Part[]): Message => ({ ...message, content })
+
+/** Rewrite every message whose parts the mapper changes; otherwise reuse it. */
+function rewrite(messages: Message[], map: (message: Message, index: number) => Message | undefined): {
+  messages: Message[]
+  elided: number
+} {
+  let elided = 0
+  const next = messages.map((message, index) => {
+    const replacement = map(message, index)
+    if (!replacement) return message
+    elided++
+    return replacement
+  })
+  return { messages: elided ? next : messages, elided }
+}
+
+export function shrinkMessages(messages: Message[], level: ShrinkLevel): ShrinkResult {
+  if (!Array.isArray(messages) || !messages.length) return { messages, elided: 0 }
+
+  if (level === 1) {
+    return rewrite(messages, (message) => {
+      if (message.role !== "tool" || !Array.isArray(message.content)) return undefined
+      let changed = false
+      const content = message.content.map((part) => {
+        const text = typeof part.text === "string" ? part.text : undefined
+        if (!text || text.length <= SHRINK_TOOL_CHARS) return part
+        changed = true
+        return { ...part, text: elide(text, KEEP_HEAD, KEEP_TAIL, `elided ${text.length - KEEP_HEAD - KEEP_TAIL} chars of tool output`) }
+      })
+      return changed ? copyMessage(message, content) : undefined
+    })
+  }
+
+  if (level === 2) {
+    const seen = new Map<string, number>()
+    messages.forEach((message, index) => {
+      if (message.role !== "tool" || !Array.isArray(message.content)) return
+      for (const part of message.content) {
+        const text = typeof part.text === "string" ? part.text : undefined
+        if (!text || text.length < DEDUPE_MIN_CHARS) continue
+        seen.set(text, index)
+      }
+    })
+    return rewrite(messages, (message, index) => {
+      if (message.role !== "tool" || !Array.isArray(message.content)) return undefined
+      let changed = false
+      const content = message.content.map((part) => {
+        const text = typeof part.text === "string" ? part.text : undefined
+        if (!text || text.length < DEDUPE_MIN_CHARS) return part
+        // Keep the newest copy: later reads are the ones the model just acted on.
+        if (seen.get(text) === index) return part
+        changed = true
+        return { ...part, text: `[ctx-limit: ${text.length} chars of tool output elided, identical to a later result]` }
+      })
+      return changed ? copyMessage(message, content) : undefined
+    })
+  }
+
+  const lastAssistant = messages.reduce((last, message, index) => (message.role === "assistant" ? index : last), -1)
+  return rewrite(messages, (message, index) => {
+    if (message.role !== "assistant" || index === lastAssistant || !Array.isArray(message.content)) return undefined
+    let changed = false
+    const content = message.content.map((part) => {
+      // Tool-call parts are structural: dropping them breaks result pairing.
+      if (part.type !== "text") return part
+      const text = typeof part.text === "string" ? part.text : undefined
+      if (!text || text.length <= SHRINK_ASSISTANT_MIN) return part
+      changed = true
+      return { ...part, text: elide(text, SHRINK_ASSISTANT_CHARS, 0, `elided ${text.length - SHRINK_ASSISTANT_CHARS} chars of earlier assistant text`) }
+    })
+    return changed ? copyMessage(message, content) : undefined
+  })
+}

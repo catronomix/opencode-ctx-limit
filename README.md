@@ -20,8 +20,12 @@ window, or just want sessions to stay predictable.
 - **Enforced on the request itself.** OpenCode applies `limit` from model config in ways a
   registry transform can't always reach, so the cap is also applied to the exact payload
   about to be sent.
-- **Turn-aware trimming.** Oldest turns are dropped whole from the front, so an assistant
-  tool call is never separated from its tool result. The newest turn is always kept.
+- **Shrink before cut.** Oversized tool output is elided first, then tool output that was
+  already read later in the session, then prose from older assistant turns. Whole turns are
+  dropped only when elision is not enough, so your own words are the last thing to go.
+- **Turn-aware trimming.** When messages must be dropped, the oldest turns go first, from a
+  user boundary, so an assistant tool call is never separated from its tool result. The
+  newest turn is always kept.
 - **Honest output budgets.** Output becomes `min(configured, cap / 4)`, clamped to
   1k–32k tokens, so generation can't starve the input budget.
 - **Instant control.** Palette commands, a `/ctxmax` slash command, and presets. Change it
@@ -32,14 +36,14 @@ window, or just want sessions to stay predictable.
 Published as `@catronomix/opencode-ctx-limit` on npm:
 
 ```sh
-opencode plugin add @catronomix/opencode-ctx-limit@0.1.3
+opencode plugin add @catronomix/opencode-ctx-limit@0.2.0
 ```
 
 Or add it to `plugins` in `~/.config/opencode/opencode.json(c)` yourself:
 
 ```jsonc
 {
-  "plugins": ["@catronomix/opencode-ctx-limit@0.1.3"]
+  "plugins": ["@catronomix/opencode-ctx-limit@0.2.0"]
 }
 ```
 
@@ -98,8 +102,22 @@ Two layers, because model config in OpenCode wins over registry transforms:
 1. `ctx.model.transform` clamps every registry entry whose `limit.context` or `limit.output`
    exceeds the cap, so the UI and planning phases see the capped number.
 2. `ctx.session.hook("context")` re-applies the cap to the final request: recompute the
-   output budget, subtract the estimated system prompt, then trim old turns until the tail
-   fits.
+   output budget, subtract the estimated system prompt, then shrink and, if that is still not
+   enough, trim.
+
+Shrinking runs in three escalating passes and stops as soon as the payload fits:
+
+| Pass | Gives up first                                                        |
+| ---- | --------------------------------------------------------------------- |
+| 1    | Oversized tool output (keeps the head and tail, marks the elision)     |
+| 2    | Tool output identical to a later result (the newest copy is kept)      |
+| 3    | Prose in older assistant turns (tool calls are never touched)          |
+
+Only then are whole turns dropped from the front, at user boundaries.
+
+Compaction is deliberately left to the host: this plugin never makes an extra model call and
+never triggers compaction behind your back. If a session is genuinely too big, use
+OpenCode's own `/compact`.
 
 Token counts are a cheap provider-agnostic estimate (~4 characters per token), not a
 tokenizer, so leave headroom for whatever tokenizer your provider actually uses.
@@ -112,8 +130,9 @@ unchanged if anything fails — a plugin bug can cost you the cap, never the req
 - No network access, no filesystem access, no subprocesses, no `eval`.
 - The only state is one number in OpenCode's own plugin storage.
 - Settings changes travel over the plugin RPC channel, not the internet.
-- Trimming is logged once per session:
-  `ctx-limit: trimmed N message(s) to fit the M token cap`.
+- No hidden model calls: shrinking is local string work, never a summarisation request.
+- Shrinking and trimming are logged once per session:
+  `ctx-limit: elided N message(s) of tool output, dropped M old message(s) to fit the K token cap`.
 
 See [`PUBLISH-GUIDE.md`](PUBLISH-GUIDE.md) for how the package is built and published.
 

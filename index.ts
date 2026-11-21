@@ -1,6 +1,6 @@
 import { Plugin } from "@opencode/plugin"
 
-import { estimateTokens, inputBudget, outputBudget, trimMessages, type Message } from "./logic.ts"
+import { estimateTokens, inputBudget, outputBudget, shrinkMessages, trimMessages, type Message } from "./logic.ts"
 import { CtxLimit } from "./rpc.ts"
 
 const STORAGE_KEY = "ctx-limit"
@@ -63,10 +63,25 @@ export default Plugin.define({
           return
         }
         const budget = inputBudget(cap, output, estimateTokens(event.system))
-        const { messages, dropped } = trimMessages(incoming as Message[], budget)
+
+        // Shrink before cutting: elide the cheapest context first, escalating
+        // one level at a time and stopping as soon as the payload fits.
+        let working = incoming as Message[]
+        let elided = 0
+        if (estimateTokens(working) > budget) {
+          for (const level of [1, 2, 3] as const) {
+            const shrunk = shrinkMessages(working, level)
+            if (!shrunk.elided) continue
+            working = shrunk.messages
+            elided += shrunk.elided
+            if (estimateTokens(working) <= budget) break
+          }
+        }
+
+        const { messages, dropped } = trimMessages(working, budget)
 
         event.options.maxTokens = output
-        if (!dropped) return
+        if (!dropped && !elided) return
 
         event.messages = messages as typeof event.messages
         if (trimmedSessions.has(event.sessionID)) return
@@ -75,9 +90,11 @@ export default Plugin.define({
           const oldest = trimmedSessions.values().next().value
           if (oldest !== undefined) trimmedSessions.delete(oldest)
         }
-        console.error(
-          `ctx-limit: trimmed ${dropped} message(s) to fit the ${cap} token cap (output ${output})`,
-        )
+        const parts = [
+          elided ? `elided ${elided} message(s) of tool output` : undefined,
+          dropped ? `dropped ${dropped} old message(s)` : undefined,
+        ].filter(Boolean)
+        console.error(`ctx-limit: ${parts.join(", ")} to fit the ${cap} token cap (output ${output})`)
       } catch (error) {
         console.error("ctx-limit: could not apply the cap, sending the request unchanged", error)
       }

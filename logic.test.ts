@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { describeError, describeLimitError, estimateTokens, inputBudget, outputBudget, sameDirectory, trimMessages, type Message } from "./logic.ts"
+import { describeError, describeLimitError, estimateTokens, inputBudget, outputBudget, sameDirectory, shrinkMessages, trimMessages, type Message } from "./logic.ts"
 
 const text = (value: string): Message => ({ role: "user", content: [{ type: "text", text: value }] })
 
@@ -73,6 +73,74 @@ test("trimMessages handles a conversation without user turns", () => {
   const messages: Message[] = [{ role: "system", content: [{ type: "text", text: "x".repeat(4_000) }] }]
   const result = trimMessages(messages, 10)
   assert.equal(result.dropped, 0)
+})
+
+const long = (size: number) => "x".repeat(size)
+
+test("shrinkMessages level 1 elides oversized tool output and keeps its head and tail", () => {
+  const body = `${"H".repeat(1_200)}${"M".repeat(3_000)}${"T".repeat(800)}`
+  const messages: Message[] = [
+    text("keep me"),
+    { role: "assistant", content: [{ type: "text", text: "older chatter" }] },
+    { role: "tool", content: [{ type: "tool-result", text: body }] },
+  ]
+  const result = shrinkMessages(messages, 1)
+  assert.equal(result.elided, 1)
+  const part = result.messages[2].content[0]
+  assert.match(String(part.text), /ctx-limit: elided \d+ chars of tool output/)
+  assert.ok(String(part.text).startsWith("H".repeat(1_200)))
+  assert.ok(String(part.text).endsWith("T".repeat(800)))
+  assert.ok(String(part.text).length < body.length)
+  // Everything that is not oversized tool output is untouched.
+  assert.deepEqual(result.messages[0], messages[0])
+  assert.deepEqual(result.messages[1], messages[1])
+})
+
+test("shrinkMessages level 1 returns the same array when nothing is oversized", () => {
+  const messages: Message[] = [text("a"), { role: "tool", content: [{ type: "tool-result", text: "short" }] }]
+  const result = shrinkMessages(messages, 1)
+  assert.equal(result.elided, 0)
+  assert.equal(result.messages, messages)
+})
+
+test("shrinkMessages level 2 elides duplicate tool output and keeps the newest copy", () => {
+  const body = long(500)
+  const messages: Message[] = [
+    { role: "tool", content: [{ type: "tool-result", text: body }] },
+    text("next turn"),
+    { role: "tool", content: [{ type: "tool-result", text: body }] },
+  ]
+  const result = shrinkMessages(messages, 2)
+  assert.equal(result.elided, 1)
+  assert.match(String(result.messages[0].content[0].text), /identical to a later result/)
+  assert.equal(result.messages[2].content[0].text, body)
+})
+
+test("shrinkMessages level 2 leaves short duplicates alone", () => {
+  const messages: Message[] = [
+    { role: "tool", content: [{ type: "tool-result", text: "same" }] },
+    { role: "tool", content: [{ type: "tool-result", text: "same" }] },
+  ]
+  assert.equal(shrinkMessages(messages, 2).elided, 0)
+})
+
+test("shrinkMessages level 3 shortens older assistant prose but keeps tool calls and users", () => {
+  const call = { type: "tool-call", id: "tool_1", text: long(3_000) }
+  const messages: Message[] = [
+    text("user words must survive"),
+    { role: "assistant", content: [{ type: "text", text: long(2_000) }, call] },
+    text("again"),
+    { role: "assistant", content: [{ type: "text", text: long(2_000) }] },
+  ]
+  const result = shrinkMessages(messages, 3)
+  assert.equal(result.elided, 1)
+  const older = result.messages[1]
+  assert.match(String(older.content[0].text), /earlier assistant text/)
+  assert.ok(String(older.content[0].text).length < 2_000)
+  assert.deepEqual(older.content[1], call)
+  assert.deepEqual(result.messages[0], messages[0])
+  // The newest assistant turn is never shortened.
+  assert.deepEqual(result.messages[3], messages[3])
 })
 
 test("sameDirectory ignores events from other locations", () => {
