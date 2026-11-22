@@ -1,8 +1,8 @@
 # opencode-ctx-limit
 
-[![npm](https://img.shields.io/npm/v/@catronomix/opencode-ctx-limit)](https://www.npmjs.com/package/@catronomix/opencode-ctx-limit)
-[![license](https://img.shields.io/npm/l/@catronomix/opencode-ctx-limit)](LICENSE)
-[![node](https://img.shields.io/node/v/@catronomix/opencode-ctx-limit)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/@catronomix/opencode-ctx-limit?cacheSeconds=3600)](https://www.npmjs.com/package/@catronomix/opencode-ctx-limit)
+[![license](https://img.shields.io/npm/l/@catronomix/opencode-ctx-limit?cacheSeconds=3600)](LICENSE)
+[![node](https://img.shields.io/node/v/@catronomix/opencode-ctx-limit?cacheSeconds=3600)](https://nodejs.org)
 
 **One token cap for every model, in every session.**
 
@@ -51,7 +51,7 @@ Or add it to `plugins` in `~/.config/opencode/opencode.json(c)` yourself:
 }
 ```
 
-One entry loads every part. Pin an exact version with `@0.2.2` if you want stability, or use
+One entry loads every part. Append `@<version>` to pin an exact release, or use
 `github:catronomix/opencode-ctx-limit` to install straight from git.
 
 ### From a local checkout
@@ -142,8 +142,8 @@ unchanged if anything fails — a plugin bug can cost you the cap, never the req
 - Shrinking and trimming are logged once per session:
   `ctx-limit: elided N message(s) of tool output, dropped M old message(s) to fit the K token cap`.
 
-Publishing and metadata rules are kept in the shared guide at
-`C:\GITHUB\PUBLISH-GUIDE.md` (parent folder, not tracked in this repo).
+Publishing and metadata rules live in the maintainer's `PUBLISH-GUIDE.md`, which is not
+tracked in this repo.
 
 ## Troubleshooting
 
