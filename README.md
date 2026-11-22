@@ -1,4 +1,8 @@
-# ctx-limit
+# opencode-ctx-limit
+
+[![npm](https://img.shields.io/npm/v/@catronomix/opencode-ctx-limit)](https://www.npmjs.com/package/@catronomix/opencode-ctx-limit)
+[![license](https://img.shields.io/npm/l/@catronomix/opencode-ctx-limit)](LICENSE)
+[![node](https://img.shields.io/node/v/@catronomix/opencode-ctx-limit)](https://nodejs.org)
 
 **One token cap for every model, in every session.**
 
@@ -47,7 +51,7 @@ Or add it to `plugins` in `~/.config/opencode/opencode.json(c)` yourself:
 }
 ```
 
-One entry loads every part. Pin the exact version, drop `@0.1.3` to track releases, or use
+One entry loads every part. Pin an exact version with `@0.2.2` if you want stability, or use
 `github:catronomix/opencode-ctx-limit` to install straight from git.
 
 ### From a local checkout
