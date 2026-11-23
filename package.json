@@ -1,6 +1,6 @@
 {
   "name": "@catronomix/opencode-ctx-limit",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publishConfig": {
     "access": "public"
   },
@@ -36,7 +36,9 @@
   ],
   "scripts": {
     "test": "node --test logic.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release-check": "node scripts/release-check.mjs",
+    "prepack": "node scripts/release-check.mjs"
   },
   "engines": {
     "node": ">=22.6"

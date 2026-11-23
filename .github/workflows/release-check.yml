@@ -1,0 +1,24 @@
+name: release-check
+
+# Blocks the local-vs-published class of failure: the package is packed and
+# installed into an empty directory, resolved with the same strict-peer npm
+# that opencode uses, against the host versions opencode ships.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present
+      - run: node scripts/release-check.mjs
